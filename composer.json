@@ -2,7 +2,10 @@
     "name": "fof/online-users-widget",
     "description": "Forum Widget That Lists Online Users",
     "keywords": [
-        "flarum", "widget", "online", "users"
+        "flarum",
+        "widget",
+        "online",
+        "users"
     ],
     "type": "flarum-extension",
     "license": "MIT",
@@ -29,12 +32,12 @@
     },
     "require": {
         "php": "^8.2",
-        "flarum/core": "^1.8.0",
+        "flarum/core": "^2.0.0-beta",
         "fof/forum-widgets-core": "^1.0.0"
     },
     "require-dev": {
-        "flarum/testing": "^1.0.0",
-        "flarum/phpstan": "*"
+        "flarum/testing": "^2.0.0-beta",
+        "flarum/phpstan": "^2.0.0-beta"
     },
     "autoload": {
         "psr-4": {
