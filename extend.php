@@ -14,6 +14,10 @@ namespace FoF\OnlineUsers;
 use Flarum\Api\Serializer as FlarumSerializer;
 use Flarum\Api\Controller\ShowForumController;
 use Flarum\Extend;
+use Flarum\Api\Context;
+use Flarum\Api\Endpoint;
+use Flarum\Api\Resource;
+use Flarum\Api\Schema;
 
 return [
     (new Extend\Frontend('forum'))
@@ -26,6 +30,7 @@ return [
 
     new Extend\Locales(__DIR__.'/locale'),
 
+    // @TODO: Replace with the new implementation https://docs.flarum.org/2.x/extend/api#extending-api-resources
     (new Extend\ApiSerializer(FlarumSerializer\ForumSerializer::class))
         ->attribute('canViewOnlineUsersWidget', function ($serializer) {
             return $serializer->getActor()->hasPermission('viewOnlineUsersWidget');
@@ -35,6 +40,7 @@ return [
         })
         ->hasMany('onlineUsers', FlarumSerializer\UserSerializer::class),
 
+    // @TODO: Replace with the new implementation https://docs.flarum.org/2.x/extend/api#extending-api-resources
     (new Extend\ApiController(ShowForumController::class))
         ->addInclude(['onlineUsers'])
         ->prepareDataForSerialization(LoadForumOnlineUsersRelationship::class),
