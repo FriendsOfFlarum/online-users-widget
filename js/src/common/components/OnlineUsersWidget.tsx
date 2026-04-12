@@ -7,7 +7,7 @@ import Link from 'flarum/common/components/Link';
 import extractText from 'flarum/common/utils/extractText';
 import type User from 'flarum/common/models/User';
 
-import Widget, { type WidgetAttrs } from 'flarum/extensions/fof-forum-widgets-core/common/components/Widget';
+import Widget, { type WidgetAttrs } from 'ext:fof/forum-widgets-core/common/components/Widget';
 
 export default class OnlineUsersWidget extends Widget<WidgetAttrs> {
   className(): string {

@@ -1,4 +1,4 @@
-import Widgets from 'ext:flarum/extensions/fof-forum-widgets-core/common/extend/Widgets';
+import Widgets from 'ext:fof/forum-widgets-core/common/extend/Widgets';
 import OnlineUsersWidget from './components/OnlineUsersWidget';
 import type AdminApplication from 'flarum/admin/AdminApplication';
 import type ForumApplication from 'flarum/forum/ForumApplication';

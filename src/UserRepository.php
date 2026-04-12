@@ -23,7 +23,7 @@ class UserRepository
      */
     protected static $cacheKeyParameters = [];
 
-    public static function addCacheKeyParameter(callable $parameter)
+    public static function addCacheKeyParameter(callable $parameter): void
     {
         static::$cacheKeyParameters[] = $parameter;
     }
@@ -88,7 +88,7 @@ class UserRepository
         $online = $this->getLastSeenUsers($actor);
 
         return [
-            'users' => User::query()->whereIn('id', $online['users'])->get(),
+            'users' => User::query()->whereIn('id', $online['users'])->get()->all(),
             'count' => $online['count']
         ];
     }

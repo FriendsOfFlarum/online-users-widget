@@ -11,7 +11,8 @@ use Illuminate\Contracts\Container\Container;
 
 class OnlineUsers implements ExtenderInterface
 {
-    private $cacheKeyParameters = [];
+    /** @var array<callable(User): string> */
+    private array $cacheKeyParameters = [];
 
     /**
      * @param (callable(User): string)|string $callable A callable/invokable that returns a string to be used as a cache key parameter.
