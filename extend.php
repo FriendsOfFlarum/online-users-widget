@@ -1,21 +1,19 @@
 <?php
 
 /*
- * This file is part of afrux/online-users-widget.
+ * This file is part of fof/online-users-widget.
  *
- * Copyright (c) 2021 Sami Mazouz.
+ * Copyright (c) 2021 Friends of Flarum.
  *
  * For the full copyright and license information, please view the LICENSE.md
  * file that was distributed with this source code.
  */
 
-namespace Afrux\OnlineUsers;
+namespace FoF\OnlineUsers;
 
 use Flarum\Api\Serializer as FlarumSerializer;
 use Flarum\Api\Controller\ShowForumController;
 use Flarum\Extend;
-use Flarum\User\Filter\UserFilterer;
-use Flarum\User\Search\UserSearcher;
 
 return [
     (new Extend\Frontend('forum'))
@@ -42,7 +40,7 @@ return [
         ->prepareDataForSerialization(LoadForumOnlineUsersRelationship::class),
 
     (new Extend\Settings)
-        ->default('afrux-online-users-widget.max_users', 15)
-        ->default('afrux-online-users-widget.cache_ttl', 30)
-        ->default('afrux-online-users-widget.last_seen_interval', 5),
+        ->default('fof-online-users-widget.max_users', 15)
+        ->default('fof-online-users-widget.cache_ttl', 30)
+        ->default('fof-online-users-widget.last_seen_interval', 5),
 ];

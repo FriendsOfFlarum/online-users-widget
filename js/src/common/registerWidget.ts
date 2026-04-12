@@ -1,4 +1,4 @@
-import Widgets from 'flarum/extensions/afrux-forum-widgets-core/common/extend/Widgets';
+import Widgets from 'flarum/extensions/fof-forum-widgets-core/common/extend/Widgets';
 import OnlineUsersWidget from './components/OnlineUsersWidget';
 import type AdminApplication from 'flarum/admin/AdminApplication';
 import type ForumApplication from 'flarum/forum/ForumApplication';
@@ -17,5 +17,5 @@ export default function (app: ForumApplication | AdminApplication) {
       placement: 'end',
       position: 1,
     })
-    .extend(app, 'afrux-online-users-widget');
+    .extend(app, 'fof-online-users-widget');
 }

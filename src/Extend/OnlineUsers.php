@@ -1,8 +1,8 @@
 <?php
 
-namespace Afrux\OnlineUsers\Extend;
+namespace FoF\OnlineUsers\Extend;
 
-use Afrux\OnlineUsers\UserRepository;
+use FoF\OnlineUsers\UserRepository;
 use Flarum\Extend\ExtenderInterface;
 use Flarum\Extension\Extension;
 use Flarum\Foundation\ContainerUtil;

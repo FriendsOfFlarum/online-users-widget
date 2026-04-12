@@ -1,17 +1,17 @@
 <?php
 
 /*
- * This file is part of afrux/top-posters-widget.
+ * This file is part of fof/online-users-widget.
  *
- * Copyright (c) 2021 Sami Mazouz.
+ * Copyright (c) 2021 Friends of Flarum.
  *
  * For the full copyright and license information, please view the LICENSE.md
  * file that was distributed with this source code.
  */
 
-namespace Afrux\OnlineUsers;
+namespace FoF\OnlineUsers;
 
-use Afrux\ForumWidgets\SafeCacheRepositoryAdapter;
+use FoF\ForumWidgets\SafeCacheRepositoryAdapter;
 use Carbon\Carbon;
 use Flarum\User\User;
 use Flarum\Settings\SettingsRepositoryInterface;
@@ -29,7 +29,7 @@ class UserRepository
     protected $cache;
 
     /**
-     * @var array<callable(): string>
+     * @var array<callable(User): string>
      */
     protected static $cacheKeyParameters = [];
 
@@ -48,9 +48,9 @@ class UserRepository
     {
         $params = [
             $actor->hasPermission('user.viewLastSeenAt') ? 'high-access' : 'low-access',
-            $this->settings->get('afrux-online-users-widget.max_users'),
-            $this->settings->get('afrux-online-users-widget.cache_ttl'),
-            $this->settings->get('afrux-online-users-widget.last_seen_interval')
+            $this->settings->get('fof-online-users-widget.max_users'),
+            $this->settings->get('fof-online-users-widget.cache_ttl'),
+            $this->settings->get('fof-online-users-widget.last_seen_interval')
         ];
 
         foreach (self::$cacheKeyParameters as $parameter) {
@@ -59,14 +59,14 @@ class UserRepository
 
         $rand = '002';
 
-        return 'afrux-online-users-widget.users-'.$rand.'-' . md5(implode('-', $params));
+        return 'fof-online-users-widget.users-'.$rand.'-' . md5(implode('-', $params));
     }
 
     public function getLastSeenUsers(User $actor): array
     {
-        $limit = (int) $this->settings->get('afrux-online-users-widget.max_users');
-        $ttl = (int) $this->settings->get('afrux-online-users-widget.cache_ttl');
-        $interval = (int) $this->settings->get('afrux-online-users-widget.last_seen_interval');
+        $limit = (int) $this->settings->get('fof-online-users-widget.max_users');
+        $ttl = (int) $this->settings->get('fof-online-users-widget.cache_ttl');
+        $interval = (int) $this->settings->get('fof-online-users-widget.last_seen_interval');
 
         return $this->cache->remember($this->cacheKey($actor), $ttl, function () use ($actor, $limit, $interval) {
             $query = User::query()

@@ -1,58 +1,67 @@
 {
-    "name": "afrux/online-users-widget",
+    "name": "fof/online-users-widget",
     "description": "Forum Widget That Lists Online Users",
     "keywords": [
         "flarum", "widget", "online", "users"
     ],
-    "funding": [
-        {
-            "type": "other",
-            "url": "https://www.buymeacoffee.com/sycho"
-        }
-    ],
     "type": "flarum-extension",
     "license": "MIT",
-    "homepage": "https://afrux.github.io",
+    "homepage": "https://friendsofflarum.org",
     "support": {
-      "issues": "https://github.com/afrux/online-users-widget/issues",
-      "source": "https://github.com/afrux/online-users-widget",
-      "forum": "https://discuss.flarum.org/"
+        "issues": "https://github.com/FriendsOfFlarum/online-users-widget/issues",
+        "source": "https://github.com/FriendsOfFlarum/online-users-widget",
+        "forum": "https://discuss.flarum.org/"
     },
-    "require": {
-        "flarum/core": "^1.0.0",
-        "afrux/forum-widgets-core": "^0.1.7"
-    },
-    "require-dev": {
-        "flarum/testing": "^1.0.0"
-    },
-    "authors": [
+    "funding": [
         {
-            "name": "Sami Mazouz",
-            "email": "sychocouldy@gmail.com",
-            "role": "Developer"
+            "type": "website",
+            "url": "https://opencollective.com/fof/donate"
         }
     ],
+    "authors": [
+        {
+            "name": "FriendsOfFlarum",
+            "homepage": "https://friendsofflarum.org"
+        }
+    ],
+    "replace": {
+        "afrux/online-users-widget": "*"
+    },
+    "require": {
+        "php": "^8.2",
+        "flarum/core": "^1.8.0",
+        "fof/forum-widgets-core": "1.x-dev"
+    },
+    "require-dev": {
+        "flarum/testing": "^1.0.0",
+        "flarum/phpstan": "*"
+    },
     "autoload": {
         "psr-4": {
-            "Afrux\\OnlineUsers\\": "src/"
+            "FoF\\OnlineUsers\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Afrux\\OnlineUsers\\Tests\\": "tests/"
+            "FoF\\OnlineUsers\\Tests\\": "tests/"
         }
     },
     "extra": {
         "branch-alias": {
-            "dev-main": "0.1.x-dev"
+            "dev-1.x": "1.x-dev"
         },
         "flarum-extension": {
-            "title": "Online Users Widget",
+            "title": "FoF Online Users Widget",
             "category": "forum-widget",
             "icon": {
                 "name": "fas fa-user-friends",
                 "backgroundColor": "#e34b6e",
                 "color": "#fff"
+            }
+        },
+        "flarum-cli": {
+            "modules": {
+                "githubActions": true
             }
         }
     },
@@ -63,12 +72,15 @@
         ],
         "test:unit": "phpunit -c tests/phpunit.unit.xml",
         "test:integration": "phpunit -c tests/phpunit.integration.xml",
-        "test:setup": "@php tests/integration/setup.php"
+        "test:setup": "@php tests/integration/setup.php",
+        "analyse:phpstan": "phpstan analyse",
+        "clear-cache:phpstan": "phpstan clear-result-cache"
     },
     "scripts-descriptions": {
         "test": "Runs all tests.",
         "test:unit": "Runs all unit tests.",
         "test:integration": "Runs all integration tests.",
-        "test:setup": "Sets up a database for use with integration tests. Execute this only once."
+        "test:setup": "Sets up a database for use with integration tests. Execute this only once.",
+        "analyse:phpstan": "Run static analysis"
     }
 }

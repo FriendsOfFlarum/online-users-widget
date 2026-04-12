@@ -1,15 +1,15 @@
 <?php
 
 /*
- * This file is part of afrux/top-posters-widget.
+ * This file is part of fof/online-users-widget.
  *
- * Copyright (c) 2021 Sami Mazouz.
+ * Copyright (c) 2021 Friends of Flarum.
  *
  * For the full copyright and license information, please view the LICENSE.md
  * file that was distributed with this source code.
  */
 
-namespace Afrux\OnlineUsers;
+namespace FoF\OnlineUsers;
 
 use Flarum\Api\Controller\ShowForumController;
 use Flarum\Settings\SettingsRepositoryInterface;
