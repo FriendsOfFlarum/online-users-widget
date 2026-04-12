@@ -19,29 +19,17 @@ use Flarum\Settings\SettingsRepositoryInterface;
 class UserRepository
 {
     /**
-     * @var SettingsRepositoryInterface
-     */
-    protected $settings;
-
-    /**
-     * @var SafeCacheRepositoryAdapter
-     */
-    protected $cache;
-
-    /**
      * @var array<callable(User): string>
      */
     protected static $cacheKeyParameters = [];
 
-    public static function addCacheKeyParameter(callable $parameter)
+    public static function addCacheKeyParameter(callable $parameter): void
     {
         static::$cacheKeyParameters[] = $parameter;
     }
 
-    public function __construct(SettingsRepositoryInterface $settings, SafeCacheRepositoryAdapter $cache)
+    public function __construct(protected SettingsRepositoryInterface $settings, protected SafeCacheRepositoryAdapter $cache)
     {
-        $this->settings = $settings;
-        $this->cache = $cache;
     }
 
     protected function cacheKey(User $actor): string
@@ -100,7 +88,7 @@ class UserRepository
         $online = $this->getLastSeenUsers($actor);
 
         return [
-            'users' => User::query()->whereIn('id', $online['users'])->get(),
+            'users' => User::query()->whereIn('id', $online['users'])->get()->all(),
             'count' => $online['count']
         ];
     }

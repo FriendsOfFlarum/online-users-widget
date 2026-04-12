@@ -11,7 +11,8 @@ use Illuminate\Contracts\Container\Container;
 
 class OnlineUsers implements ExtenderInterface
 {
-    private $cacheKeyParameters = [];
+    /** @var array<callable(User): string> */
+    private array $cacheKeyParameters = [];
 
     /**
      * @param (callable(User): string)|string $callable A callable/invokable that returns a string to be used as a cache key parameter.
@@ -23,7 +24,7 @@ class OnlineUsers implements ExtenderInterface
         return $this;
     }
 
-    public function extend(Container $container, Extension $extension = null)
+    public function extend(Container $container, ?Extension $extension = null): void
     {
         foreach ($this->cacheKeyParameters as $parameter) {
             UserRepository::addCacheKeyParameter(ContainerUtil::wrapCallback($parameter, $container));

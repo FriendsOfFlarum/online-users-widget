@@ -11,8 +11,10 @@
 
 namespace FoF\OnlineUsers;
 
-use Flarum\Api\Serializer as FlarumSerializer;
-use Flarum\Api\Controller\ShowForumController;
+use Flarum\Api\Context;
+use Flarum\Api\Endpoint;
+use Flarum\Api\Resource;
+use Flarum\Api\Schema;
 use Flarum\Extend;
 
 return [
@@ -26,18 +28,20 @@ return [
 
     new Extend\Locales(__DIR__.'/locale'),
 
-    (new Extend\ApiSerializer(FlarumSerializer\ForumSerializer::class))
-        ->attribute('canViewOnlineUsersWidget', function ($serializer) {
-            return $serializer->getActor()->hasPermission('viewOnlineUsersWidget');
-        })
-        ->attribute('totalOnlineUsers', function (FlarumSerializer\ForumSerializer $serializer) {
-            return resolve(UserRepository::class)->getOnlineUsers($serializer->getActor())['count'] ?? 0;
-        })
-        ->hasMany('onlineUsers', FlarumSerializer\UserSerializer::class),
+    (new Extend\ApiResource(Resource\ForumResource::class))
+        ->fields(fn () => [
+            Schema\Boolean::make('canViewOnlineUsersWidget')
+                ->get(fn ($model, Context $context) => $context->getActor()->hasPermission('viewOnlineUsersWidget')),
 
-    (new Extend\ApiController(ShowForumController::class))
-        ->addInclude(['onlineUsers'])
-        ->prepareDataForSerialization(LoadForumOnlineUsersRelationship::class),
+            Schema\Integer::make('totalOnlineUsers')
+                ->get(fn ($model, Context $context) => resolve(UserRepository::class)->getOnlineUsers($context->getActor())['count'] ?? 0),
+
+            Schema\Relationship\ToMany::make('onlineUsers')
+                ->type('users')
+                ->includable()
+                ->get(fn ($model, Context $context) => resolve(UserRepository::class)->getOnlineUsers($context->getActor())['users'] ?? []),
+        ])
+        ->endpoint(Endpoint\Show::class, fn (Endpoint\Show $endpoint) => $endpoint->addDefaultInclude(['onlineUsers'])),
 
     (new Extend\Settings)
         ->default('fof-online-users-widget.max_users', 15)

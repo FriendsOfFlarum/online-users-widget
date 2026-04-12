@@ -2,7 +2,10 @@
     "name": "fof/online-users-widget",
     "description": "Forum Widget That Lists Online Users",
     "keywords": [
-        "flarum", "widget", "online", "users"
+        "flarum",
+        "widget",
+        "online",
+        "users"
     ],
     "type": "flarum-extension",
     "license": "MIT",
@@ -28,13 +31,12 @@
         "afrux/online-users-widget": "*"
     },
     "require": {
-        "php": "^8.2",
-        "flarum/core": "^1.8.0",
-        "fof/forum-widgets-core": "^1.0.0"
+        "flarum/core": "^2.0.0",
+        "fof/forum-widgets-core": "^2.0.0"
     },
     "require-dev": {
-        "flarum/testing": "^1.0.0",
-        "flarum/phpstan": "*"
+        "flarum/testing": "^2.0.0",
+        "flarum/phpstan": "^2.0.0"
     },
     "autoload": {
         "psr-4": {
@@ -48,7 +50,7 @@
     },
     "extra": {
         "branch-alias": {
-            "dev-1.x": "1.x-dev"
+            "dev-2.x": "2.x-dev"
         },
         "flarum-extension": {
             "title": "FoF Online Users Widget",
@@ -82,5 +84,7 @@
         "test:integration": "Runs all integration tests.",
         "test:setup": "Sets up a database for use with integration tests. Execute this only once.",
         "analyse:phpstan": "Run static analysis"
-    }
+    },
+    "minimum-stability": "beta",
+    "prefer-stable": true
 }
