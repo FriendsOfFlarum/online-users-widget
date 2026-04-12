@@ -2,7 +2,7 @@ import app from 'flarum/common/app';
 import type Mithril from 'mithril';
 import LoadingIndicator from 'flarum/common/components/LoadingIndicator';
 import Tooltip from 'flarum/common/components/Tooltip';
-import avatar from 'flarum/common/helpers/avatar';
+import Avatar from 'flarum/common/components/Avatar';
 import Link from 'flarum/common/components/Link';
 import extractText from 'flarum/common/utils/extractText';
 import type User from 'flarum/common/models/User';
@@ -38,7 +38,9 @@ export default class OnlineUsersWidget extends Widget<WidgetAttrs> {
         <div className="FoF-OnlineUsersWidget-users-list">
           {users.map((user: User) => (
             <Link href={app.route('user', { username: user.slug() })} className="FoF-OnlineUsersWidget-users-item">
-              <Tooltip text={user.displayName()}>{avatar(user)}</Tooltip>
+              <Tooltip text={user.displayName()}>
+                <Avatar user={user} />
+              </Tooltip>
             </Link>
           ))}
           {total > users.length ? (

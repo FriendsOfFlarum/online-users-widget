@@ -4,7 +4,7 @@ import registerWidget from '../common/registerWidget';
 app.initializers.add('fof/online-users-widget', () => {
   registerWidget(app);
 
-  app.extensionData
+  app.registry
     .for('fof-online-users-widget')
     .registerSetting({
       setting: 'fof-online-users-widget.max_users',
