@@ -10,7 +10,7 @@
     "support": {
         "issues": "https://github.com/FriendsOfFlarum/online-users-widget/issues",
         "source": "https://github.com/FriendsOfFlarum/online-users-widget",
-        "forum": "https://discuss.flarum.org/"
+        "forum": "https://discuss.flarum.org/d/39065"
     },
     "funding": [
         {
@@ -30,7 +30,7 @@
     "require": {
         "php": "^8.2",
         "flarum/core": "^1.8.0",
-        "fof/forum-widgets-core": "1.x-dev"
+        "fof/forum-widgets-core": "^1.0.0"
     },
     "require-dev": {
         "flarum/testing": "^1.0.0",
@@ -55,7 +55,7 @@
             "category": "forum-widget",
             "icon": {
                 "name": "fas fa-user-friends",
-                "backgroundColor": "#e34b6e",
+                "backgroundColor": "#e74c3c",
                 "color": "#fff"
             }
         },

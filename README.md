@@ -41,4 +41,4 @@ php flarum cache:clear
 
 - [Packagist](https://packagist.org/packages/fof/online-users-widget)
 - [GitHub](https://github.com/FriendsOfFlarum/online-users-widget)
-- [Discuss](https://discuss.flarum.org/d/PUT_DISCUSS_SLUG_HERE)
+- [Discuss](https://discuss.flarum.org/d/39065)
