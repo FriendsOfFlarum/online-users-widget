@@ -18,20 +18,8 @@ use Psr\Http\Message\ServerRequestInterface;
 
 class LoadForumOnlineUsersRelationship
 {
-    /**
-     * @var SettingsRepositoryInterface
-     */
-    protected $settings;
-
-    /**
-    * @var UserRepository
-    */
-    protected $repository;
-
-    public function __construct(SettingsRepositoryInterface $settings, UserRepository $repository)
+    public function __construct(protected SettingsRepositoryInterface $settings, protected UserRepository $repository)
     {
-        $this->settings = $settings;
-        $this->repository = $repository;
     }
 
     public function __invoke(ShowForumController $controller, &$data, ServerRequestInterface $request)

@@ -23,7 +23,7 @@ class OnlineUsers implements ExtenderInterface
         return $this;
     }
 
-    public function extend(Container $container, Extension $extension = null)
+    public function extend(Container $container, ?Extension $extension = null): void
     {
         foreach ($this->cacheKeyParameters as $parameter) {
             UserRepository::addCacheKeyParameter(ContainerUtil::wrapCallback($parameter, $container));

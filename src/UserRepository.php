@@ -19,16 +19,6 @@ use Flarum\Settings\SettingsRepositoryInterface;
 class UserRepository
 {
     /**
-     * @var SettingsRepositoryInterface
-     */
-    protected $settings;
-
-    /**
-     * @var SafeCacheRepositoryAdapter
-     */
-    protected $cache;
-
-    /**
      * @var array<callable(User): string>
      */
     protected static $cacheKeyParameters = [];
@@ -38,10 +28,8 @@ class UserRepository
         static::$cacheKeyParameters[] = $parameter;
     }
 
-    public function __construct(SettingsRepositoryInterface $settings, SafeCacheRepositoryAdapter $cache)
+    public function __construct(protected SettingsRepositoryInterface $settings, protected SafeCacheRepositoryAdapter $cache)
     {
-        $this->settings = $settings;
-        $this->cache = $cache;
     }
 
     protected function cacheKey(User $actor): string
