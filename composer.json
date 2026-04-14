@@ -36,7 +36,11 @@
     },
     "require-dev": {
         "flarum/testing": "^2.0.0",
-        "flarum/phpstan": "^2.0.0"
+        "flarum/phpstan": "^2.0.0",
+        "flarum/realtime": "2.x-dev"
+    },
+    "suggest": {
+        "flarum/realtime": "Enables live updates of the online users list via the presence-online WebSocket channel."
     },
     "autoload": {
         "psr-4": {
@@ -59,7 +63,10 @@
                 "name": "fas fa-user-friends",
                 "backgroundColor": "#e74c3c",
                 "color": "#fff"
-            }
+            },
+            "optional-dependencies": [
+                "flarum/realtime"
+            ]
         },
         "flarum-cli": {
             "modules": {

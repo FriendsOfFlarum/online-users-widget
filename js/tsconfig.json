@@ -4,6 +4,7 @@
     "src/**/*",
     "../vendor/flarum/core/js/dist-typings/@types/**/*",
     "../vendor/fof/forum-widgets-core/js/dist-typings/@types/**/*",
+    "../vendor/flarum/realtime/js/dist-typings/@types/**/*"
   ],
   "compilerOptions": {
     "declarationDir": "./dist-typings",
@@ -14,6 +15,9 @@
       ],
       "ext:fof/forum-widgets-core/*": [
         "../vendor/fof/forum-widgets-core/js/dist-typings/*"
+      ],
+      "ext:flarum/realtime/*": [
+        "../vendor/flarum/realtime/js/dist-typings/*"
       ]
     }
   }

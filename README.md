@@ -37,6 +37,23 @@ php flarum migrate
 php flarum cache:clear
 ```
 
+## flarum/realtime integration
+
+If [flarum/realtime](https://github.com/flarum/framework/tree/2.x/extensions/realtime) is installed, the widget automatically switches to live updates via the `presence-online` WebSocket presence channel. No configuration is required.
+
+When realtime is active:
+
+- The widget updates **instantly** when users connect or disconnect, rather than reflecting a cached snapshot from page load.
+- All logged-in users are tracked via the presence channel, so the list stays accurate as people arrive and leave.
+- Users without the `viewOnlineUsersWidget` permission still join the presence channel (so they are visible to others) but the widget is not activated for them.
+
+When realtime is not installed the widget falls back to the standard behaviour: the online users list is populated from the forum API payload on page load, cached server-side according to the configured TTL.
+
+> [!NOTE]
+> The presence channel tracks **active WebSocket connections**, not `last_seen_at`. A user appears in the widget as soon as their browser connects and disappears as soon as their last tab closes, regardless of the configured "last seen interval" setting. The last seen interval setting only affects the fallback (non-realtime) behaviour.
+>
+> A user with multiple tabs or browsers open counts as a single online user. They appear in the widget on their first connection and are removed only when all their connections close.
+
 ## Links
 
 - [Packagist](https://packagist.org/packages/fof/online-users-widget)
