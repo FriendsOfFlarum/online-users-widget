@@ -8,6 +8,7 @@ import extractText from 'flarum/common/utils/extractText';
 import type User from 'flarum/common/models/User';
 
 import Widget, { type WidgetAttrs } from 'ext:fof/forum-widgets-core/common/components/Widget';
+import onlineUsersState from '../onlineUsersState';
 
 export default class OnlineUsersWidget extends Widget<WidgetAttrs> {
   className(): string {
@@ -27,8 +28,16 @@ export default class OnlineUsersWidget extends Widget<WidgetAttrs> {
       return <LoadingIndicator />;
     }
 
-    const users = app.forum.onlineUsers() || [];
-    const total = app.forum.totalOnlineUsers() || 0;
+    let users: User[];
+    let total: number;
+
+    if (onlineUsersState.realtimeActive) {
+      users = [...onlineUsersState.userIds].map((id) => app.store.getById<User>('users', id)).filter((u): u is User => u !== undefined);
+      total = onlineUsersState.total;
+    } else {
+      users = app.forum.onlineUsers() || [];
+      total = app.forum.totalOnlineUsers() || 0;
+    }
 
     return (
       <div className="FoF-OnlineUsersWidget-users">
