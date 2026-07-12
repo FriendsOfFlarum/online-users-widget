@@ -10,6 +10,17 @@ import type User from 'flarum/common/models/User';
 import Widget, { type WidgetAttrs } from 'flarum/extensions/fof-forum-widgets-core/common/components/Widget';
 
 export default class OnlineUsersWidget extends Widget<WidgetAttrs> {
+
+  oncreate(vnode): void {
+    this.attrs.state.users = app.forum.onlineUsers() || [];
+    this.attrs.state.total = app.forum.totalOnlineUsers() || 0;
+    if (!this.attrs.state.timerAdded) {
+    console.log("onliner timer added");
+        setInterval(this.load.bind(this), 120000);
+        this.attrs.state.timerAdded = true;
+    }
+  }
+
   className(): string {
     return 'FoF-OnlineUsersWidget';
   }
@@ -27,8 +38,10 @@ export default class OnlineUsersWidget extends Widget<WidgetAttrs> {
       return <LoadingIndicator />;
     }
 
-    const users = app.forum.onlineUsers() || [];
-    const total = app.forum.totalOnlineUsers() || 0;
+    this.attrs.state.users = (this.attrs.state.users || app.forum.onlineUsers()) || [];
+    const users = this.attrs.state.users;
+    this.attrs.state.total = (this.attrs.state.total || app.forum.totalOnlineUsers()) || 0;
+    const total = this.attrs.state.total;
 
     return (
       <div className="FoF-OnlineUsersWidget-users">
@@ -43,11 +56,49 @@ export default class OnlineUsersWidget extends Widget<WidgetAttrs> {
           ))}
           {total > users.length ? (
             <span className="FoF-OnlineUsersWidget-users-item FoF-OnlineUsersWidget-users-item--plus">
-              <span className="Avatar">{`+${total - users.length}`}</span>
+              <span className="Avatar">{total < 50? `+${total - users.length}` : `+${50 - users.length}...`}</span>
             </span>
           ) : null}
         </div>
       </div>
     );
   }
+
+  async load(): Promise<void> {
+    if (this.loadWithInitialResponse) {
+      this.setResults(app.forum.onlineUsers());
+      return;
+    }
+
+    this.attrs.state.isLoading = true;
+
+    try {
+      const response = await app.request<OnlineUsersResponse>({
+        method: 'GET',
+        url: app.forum.attribute('apiUrl') + '/online-users'
+      });
+
+      app.store.pushPayload(response);
+
+      const users = response.data.map(userData => 
+        app.store.getById('users', userData.id)
+      );
+
+      this.setResults(users, response.meta);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      this.attrs.state.isLoading = false;
+    }
+  }
+
+  setResults(data, meta) {
+    this.attrs.state.users = data;
+    this.attrs.state.total = meta?.totalCount;
+    this.attrs.state.isLoading = false;
+    this.attrs.state.hasLoaded = true;
+    m.redraw();
+    console.log("redrew");
+  }
+
 }
