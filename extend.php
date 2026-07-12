@@ -26,6 +26,8 @@ return [
 
     new Extend\Locales(__DIR__.'/locale'),
 
+    (new Extend\Routes('api'))
+        ->get('/online-users', 'fof.online-users.list', Api\Controller\ListOnlineUsersController::class),
     (new Extend\ApiSerializer(FlarumSerializer\ForumSerializer::class))
         ->attribute('canViewOnlineUsersWidget', function ($serializer) {
             return $serializer->getActor()->hasPermission('viewOnlineUsersWidget');
@@ -42,5 +44,6 @@ return [
     (new Extend\Settings)
         ->default('fof-online-users-widget.max_users', 15)
         ->default('fof-online-users-widget.cache_ttl', 30)
-        ->default('fof-online-users-widget.last_seen_interval', 5),
+        ->default('fof-online-users-widget.last_seen_interval', 5)
+        ->serializeToForum('fof-online-users-widget.maxUsers', 'fof-online-users-widget.max_users', 'intval'),
 ];
