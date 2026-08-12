@@ -2,7 +2,10 @@ fof-online-users-widget:
   admin:
     settings:
       cache_ttl: Time to cache the users list (in seconds)
-      last_seen_interval: Last seen interval to consider a user online (in minutes)
+      last_seen_interval: >
+        Last seen interval to consider a user online (in minutes). Used for guests
+        and when Realtime is not installed; with Realtime, logged-in users see who
+        is actually connected.
       max_users: Max shown users
     permissions:
       view_online_users_widget: View Online Users Widget

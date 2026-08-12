@@ -24,19 +24,16 @@ export default class OnlineUsersWidget extends Widget<WidgetAttrs> {
   }
 
   content(): Mithril.Children {
-    if (this.attrs.state.isLoading) {
+    // Always the server's answer. Realtime keeps it current by refetching when
+    // presence membership changes, rather than substituting its own list — see
+    // forum/extendRealtime.ts.
+    const users: User[] = (app.forum.onlineUsers() || []).filter((u): u is User => u !== undefined);
+    const total: number = app.forum.totalOnlineUsers() || 0;
+
+    // Only the very first load has nothing to show; later refetches swap
+    // results in underneath the existing list rather than blanking it.
+    if (onlineUsersState.isLoading && users.length === 0) {
       return <LoadingIndicator />;
-    }
-
-    let users: User[];
-    let total: number;
-
-    if (onlineUsersState.realtimeActive) {
-      users = [...onlineUsersState.userIds].map((id) => app.store.getById<User>('users', id)).filter((u): u is User => u !== undefined);
-      total = onlineUsersState.total;
-    } else {
-      users = app.forum.onlineUsers() || [];
-      total = app.forum.totalOnlineUsers() || 0;
     }
 
     return (
