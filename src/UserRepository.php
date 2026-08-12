@@ -33,18 +33,13 @@ class UserRepository
     {
     }
 
-    /**
-     * @param int[]|null $presenceIds
-     */
-    protected function cacheKey(User $actor, ?array $presenceIds = null): string
+    protected function cacheKey(User $actor): string
     {
         $params = [
             $actor->hasPermission('user.viewLastSeenAt') ? 'high-access' : 'low-access',
             $this->settings->get('fof-online-users-widget.max_users'),
             $this->settings->get('fof-online-users-widget.cache_ttl'),
             $this->settings->get('fof-online-users-widget.last_seen_interval'),
-            // A presence-scoped result is only valid for that exact roster.
-            $presenceIds === null ? 'last-seen' : 'presence:'.implode(',', $presenceIds),
         ];
 
         foreach (static::$cacheKeyParameters as $parameter) {
@@ -55,48 +50,33 @@ class UserRepository
     }
 
     /**
-     * Resolve the set of users to show as online, plus the total before the
+     * Resolve the users to show as online, plus the total before the
      * `max_users` cap is applied.
      *
-     * Two definitions of "online" are possible, and the caller chooses by
-     * supplying (or omitting) a presence roster:
-     *
-     * - **Presence roster given** — the exact set of users holding a websocket
-     *   right now, as reported by realtime's `presence-online` channel. This is
-     *   the accurate definition: a user leaves the list the moment their socket
-     *   closes, and an idle user with a live socket stays listed.
-     * - **No roster** — fall back to `last_seen_at` within `last_seen_interval`.
-     *   Used for guests (who are refused presence auth), for installs without
-     *   flarum/realtime, and for the very first page render before the socket
-     *   has connected.
-     *
-     * Either way the visibility scope, the `discloseOnline` preference and the
-     * `max_users` cap are applied here, server-side — none of which a client
-     * holding a presence roster can do for itself.
-     *
-     * @param int[]|null $presenceIds
+     * "Online" means `last_seen_at` within `last_seen_interval`. This is
+     * deliberately the only definition: realtime's `presence-online` roster is
+     * an exact list of live sockets, but it is also the *subscriber* list, and
+     * subscribing requires `viewOnlineUsersWidget` — so on any forum that
+     * restricts that permission the roster is a small subset of who is actually
+     * online, and using it would shrink the list rather than sharpen it.
+     * Realtime instead refetches this result when membership changes.
      *
      * @return array{users: int[], count: int}
      */
-    public function getOnlineUserIds(User $actor, ?array $presenceIds = null): array
+    public function getOnlineUserIds(User $actor): array
     {
         $limit = (int) $this->settings->get('fof-online-users-widget.max_users');
         $ttl = (int) $this->settings->get('fof-online-users-widget.cache_ttl');
         $interval = (int) $this->settings->get('fof-online-users-widget.last_seen_interval');
 
         $result = $this->cache->remember(
-            $this->cacheKey($actor, $presenceIds),
+            $this->cacheKey($actor),
             $ttl,
-            function () use ($actor, $limit, $interval, $presenceIds) {
+            function () use ($actor, $limit, $interval) {
                 $query = User::query()
                     ->select('id', 'preferences')
-                    ->whereVisibleTo($actor);
-
-                if ($presenceIds === null) {
-                    $query->where('last_seen_at', '>', Carbon::now()->subMinutes($interval));
-                } else {
-                    $query->whereIn('id', $presenceIds);
-                }
+                    ->whereVisibleTo($actor)
+                    ->where('last_seen_at', '>', Carbon::now()->subMinutes($interval));
 
                 // user.viewLastSeenAt is a permission that allows viewing online state
                 // regardless of the privacy preference not to be shown. Applied in SQL
@@ -141,13 +121,11 @@ class UserRepository
     }
 
     /**
-     * @param int[]|null $presenceIds
-     *
      * @return array{users: User[], count: int}
      */
-    public function getOnlineUsers(User $actor, ?array $presenceIds = null): array
+    public function getOnlineUsers(User $actor): array
     {
-        $online = $this->getOnlineUserIds($actor, $presenceIds);
+        $online = $this->getOnlineUserIds($actor);
 
         if (empty($online['users'])) {
             return ['users' => [], 'count' => $online['count']];
