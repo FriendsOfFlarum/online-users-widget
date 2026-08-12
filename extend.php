@@ -19,38 +19,6 @@ use Flarum\Extend;
 use Flarum\User\User;
 
 /**
- * Read the presence roster the client passed alongside the request, if any.
- *
- * The client sends the membership of realtime's `presence-online` channel so
- * that "online" can mean "holds a websocket right now" rather than "made an
- * HTTP request in the last few minutes". The ids are a *filter*, never a
- * source of truth: everything they resolve to still passes the visibility
- * scope, the discloseOnline preference and the max_users cap server-side, so a
- * forged roster can only ever narrow what the actor was already allowed to see.
- *
- * Absent param → fall back to the last_seen_at window (guests, installs
- * without flarum/realtime, and the first render before the socket connects).
- *
- * @return int[]|null
- */
-$presenceIds = function (Context $context): ?array {
-    $param = $context->queryParam('onlineIds');
-
-    if ($param === null) {
-        return null;
-    }
-
-    $ids = array_filter(
-        array_map('intval', explode(',', (string) $param)),
-        fn (int $id) => $id > 0
-    );
-
-    // An explicitly empty roster means "nobody is connected", which is
-    // distinct from "no roster supplied" and must not fall back.
-    return array_values(array_unique($ids));
-};
-
-/**
  * Resolve the online users once per request.
  *
  * `totalOnlineUsers` and the `onlineUsers` relationship both need the same
@@ -58,16 +26,15 @@ $presenceIds = function (Context $context): ?array {
  *
  * Memoized in a local rather than on the Context: the serializer hands each
  * field its own Context (`withField()` clones), so `setParam()` writes would
- * not be visible to the sibling field. Keyed by actor id and roster so that
- * nothing leaks between actors should the closure outlive one request.
+ * not be visible to the sibling field. Keyed by actor so nothing leaks between
+ * actors should the closure outlive one request.
  */
 $memo = [];
 
-$resolve = function (Context $context) use ($presenceIds, &$memo): array {
-    $ids = $presenceIds($context);
-    $key = $context->getActor()->id.'|'.($ids === null ? 'last-seen' : implode(',', $ids));
+$resolve = function (Context $context) use (&$memo): array {
+    $actor = $context->getActor();
 
-    return $memo[$key] ??= resolve(UserRepository::class)->getOnlineUsers($context->getActor(), $ids);
+    return $memo[$actor->id ?? 'guest'] ??= resolve(UserRepository::class)->getOnlineUsers($actor);
 };
 
 return [
