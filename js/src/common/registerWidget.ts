@@ -8,11 +8,11 @@ export default function (app: ForumApplication | AdminApplication) {
     .add({
       key: 'onlineUsers',
       component: OnlineUsersWidget,
-      isDisabled: (): boolean => {
-        const onlineUsers = app.forum.onlineUsers();
-
-        return Boolean(!app.forum.attribute<boolean>('canViewOnlineUsersWidget') || !onlineUsers || !onlineUsers.length);
-      },
+      // Gated on permission alone. Keying this on the list being non-empty
+      // would unmount the widget whenever the roster momentarily resolved to
+      // nobody visible, taking the "no users online" message down with it —
+      // the widget renders that message itself.
+      isDisabled: (): boolean => !app.forum.attribute<boolean>('canViewOnlineUsersWidget'),
       isUnique: true,
       placement: 'end',
       position: 1,
