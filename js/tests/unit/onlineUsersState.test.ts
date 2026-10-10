@@ -35,6 +35,12 @@ describe('OnlineUsersState', () => {
   beforeEach(() => {
     jest.useFakeTimers({ now: 1_000_000 });
 
+    // The refetch delay is 2 seconds plus a random spread of up to 3. Unpinned, what these
+    // tests see depends on the draw: an event 1.5s before the request starts is "covered" if
+    // the request is 4s out and "not yet" if it is 2.5s out. So every test gets the middle of
+    // the range (3.5s), and the few that are about an edge pin the edge they mean.
+    jest.spyOn(Math, 'random').mockReturnValue(0.5);
+
     respond = async () => ({ data: {} });
 
     request = jest.spyOn(app, 'request').mockImplementation(((options: any) => respond(options)) as any);
@@ -114,9 +120,9 @@ describe('OnlineUsersState', () => {
     });
 
     it('never trigger a refetch sooner than 2 seconds after the event', async () => {
-      // The delay is 2 seconds plus a random spread; pin the spread to nothing so this
-      // tests the floor, which is what the server's 2 second window depends on.
-      jest.spyOn(Math, 'random').mockReturnValue(0);
+      // Pin the spread to nothing, so this tests the floor, which is what the server's
+      // 2 second window depends on.
+      (Math.random as any).mockReturnValue(0);
 
       state.widgetCreated();
       state.presenceChanged();
@@ -154,7 +160,7 @@ describe('OnlineUsersState', () => {
       // The server answers fresh requests from a 2 second window, so an answer can be up
       // to that much older than the request that fetched it. An event that close to the
       // start may not be in it.
-      jest.spyOn(Math, 'random').mockReturnValue(0);
+      (Math.random as any).mockReturnValue(0);
 
       state.widgetCreated();
       state.presenceChanged(); // t = 0: the refetch is armed for t = 2s
