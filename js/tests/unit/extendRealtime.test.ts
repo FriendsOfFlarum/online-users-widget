@@ -37,7 +37,9 @@ describe('extendRealtime', () => {
     app.forum.pushAttributes({ canJoinOnlineUsersPresence: true });
 
     state = new OnlineUsersState();
-    presenceChanged = jest.spyOn(state, 'presenceChanged');
+    // Only whether it was called matters here. Letting it run would arm a real timer for a
+    // refetch that these tests do not look at.
+    presenceChanged = jest.spyOn(state, 'presenceChanged').mockImplementation(() => {});
 
     // Nothing needs refetching in these tests; keep requests out of them.
     jest.spyOn(app, 'request').mockImplementation((() => new Promise(() => {})) as any);
