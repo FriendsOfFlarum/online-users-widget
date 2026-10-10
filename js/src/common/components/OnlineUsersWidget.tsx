@@ -51,7 +51,14 @@ export default class OnlineUsersWidget extends Widget<WidgetAttrs> {
         </div>
         <div className="FoF-OnlineUsersWidget-users-list">
           {users.map((user: User) => (
-            <Link key={user.id()} href={app.route('user', { username: user.slug() })} className="FoF-OnlineUsersWidget-users-item">
+            <Link
+              key={user.id()}
+              href={app.route('user', { username: user.slug() })}
+              className="FoF-OnlineUsersWidget-users-item"
+              // The profile this opens is built from the store, which only holds a bare
+              // record of the user. See OnlineUsersState.hydrate().
+              onclick={() => onlineUsersState.hydrate(user)}
+            >
               <Tooltip text={user.displayName()}>
                 <Avatar user={user} />
               </Tooltip>

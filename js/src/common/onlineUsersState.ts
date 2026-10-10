@@ -1,4 +1,5 @@
 import app from 'flarum/common/app';
+import type User from 'flarum/common/models/User';
 
 /**
  * A widget that mounts refetches when the data on the page is older than this.
@@ -41,6 +42,9 @@ export class OnlineUsersState {
   /** When each presence event not yet reflected in the list arrived. */
   protected pendingEvents: number[] = [];
   protected timer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Users whose profile data has been fetched, so a second click does not repeat it. */
+  protected hydrated = new Set<string>();
 
   /** Request ordering: a response is dropped if a later request already landed. */
   protected started = 0;
@@ -107,6 +111,33 @@ export class OnlineUsersState {
     this.pendingEvents.push(Date.now());
 
     if (this.mounted > 0) this.scheduleRefresh();
+  }
+
+  /**
+   * Fetch the user's real profile data, ahead of their profile opening.
+   *
+   * The online users come from the forum payload, which carries a user's own
+   * attributes but none of their relationships. Core's profile page reuses any user
+   * in the store that has `joinTime` rather than fetching, so opened from here it
+   * would render from that bare record, without whatever the profile is built from
+   * that is not an attribute: the group badges, and anything an extension adds.
+   *
+   * Asking the user endpoint settles that for every extension at once. It applies
+   * the includes and eager loads that are registered for a profile, whoever
+   * registered them, so nothing here needs to know what they are, and the response
+   * updates the same record the profile is showing.
+   *
+   * It runs in the background and is silent on failure; a failed fetch is retried on
+   * the next click.
+   */
+  hydrate(user: User): void {
+    const id = user.id();
+
+    if (!id || this.hydrated.has(id)) return;
+
+    this.hydrated.add(id);
+
+    app.store.find<User>('users', user.slug(), { bySlug: true }, { errorHandler: () => {} }).catch(() => this.hydrated.delete(id));
   }
 
   isStale(): boolean {
