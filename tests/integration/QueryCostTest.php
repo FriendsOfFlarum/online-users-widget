@@ -89,6 +89,33 @@ class QueryCostTest extends OnlineUsersTestCase
     }
 
     /**
+     * The SQL without the parts that differ between the supported setups, so one
+     * needle matches on all of them: MySQL quotes identifiers with backticks, the
+     * others with double quotes, and a configured table prefix is part of every
+     * table name.
+     */
+    protected function plainSql(string $sql): string
+    {
+        $sql = str_replace(['`', '"'], '', $sql);
+        $prefix = $this->database()->getTablePrefix();
+
+        // Only where it starts an identifier, so a short prefix such as `p_` is not
+        // also removed from the inside of `group_user`.
+        return $prefix === '' ? $sql : preg_replace('/(?<![A-Za-z0-9_])'.preg_quote($prefix, '/').'(?=[A-Za-z_])/', '', $sql);
+    }
+
+    /**
+     * How many of `$queries` are the widget's own: the count, the ids, or the
+     * loading of the users it found.
+     *
+     * @param array<array{sql: string, bindings: array}> $queries
+     */
+    protected function widgetQueries(array $queries): int
+    {
+        return count(array_filter(array_column($queries, 'sql'), fn (string $sql) => str_contains($sql, 'from users where last_seen_at')));
+    }
+
+    /**
      * Run `$request`, returning the queries it issued.
      *
      * @return array<array{sql: string, bindings: array}>
@@ -100,7 +127,7 @@ class QueryCostTest extends OnlineUsersTestCase
 
         $this->database()->listen(function ($query) use (&$capturing) {
             if ($capturing) {
-                $this->queries[] = ['sql' => $query->sql, 'bindings' => $query->bindings];
+                $this->queries[] = ['sql' => $this->plainSql($query->sql), 'bindings' => $query->bindings];
             }
         });
 
@@ -147,21 +174,35 @@ class QueryCostTest extends OnlineUsersTestCase
         $widget = fn (string $needle) => count(array_filter($sqlOf, fn ($sql) => str_contains($sql, $needle)));
 
         // The total and the list are two fields over one result.
-        $this->assertEquals(1, $widget('count(*) as `aggregate` from `users` where `last_seen_at`'), 'the count');
-        $this->assertEquals(1, $widget('select `id` from `users` where'), 'the ids');
-        $this->assertEquals(1, $widget('from `users` where `id` in'), 'the users, loaded together');
+        $this->assertEquals(1, $widget('count(*) as aggregate from users where last_seen_at'), 'the count');
+        $this->assertEquals(1, $widget('select id from users where last_seen_at'), 'the ids');
+        $this->assertEquals(1, $widget('from users where id in'), 'the users, loaded together');
+    }
+
+    public function test_an_actor_with_the_permission_costs_the_widget_queries()
+    {
+        $this->seedOnlineUsers(8);
+
+        // The control for the test below: the widget's queries are recognised on this
+        // driver, so finding none there means something rather than the matching
+        // having quietly stopped working.
+        $this->assertSame(2, $this->widgetQueries($this->queriesDuring(fn () => $this->forumDocument())), 'the count and the ids');
     }
 
     public function test_an_actor_without_the_permission_costs_no_widget_queries()
     {
         $this->seedOnlineUsers(8);
+
+        // Revoked before the first request, and in a test of its own: core keeps a
+        // static cache of permissions per set of groups, which deleting rows directly
+        // does not invalidate, so the same app would still see the permission.
         $this->app();
         $this->database()->table('group_permission')->where('permission', 'viewOnlineUsersWidget')->delete();
 
-        $sql = array_column($this->queriesDuring(fn () => $this->forumDocument()), 'sql');
+        $queries = $this->queriesDuring(fn () => $this->forumDocument());
 
-        $this->assertEmpty(array_filter($sql, fn ($q) => str_contains($q, '`last_seen_at` >')), 'no online users query');
-        $this->assertEmpty(array_filter($sql, fn ($q) => preg_match('/from `users` where `id` in \((?:\?, ){7,}\?\)/', $q)), 'no loading of the online users');
+        $this->assertSame(0, $this->widgetQueries($queries), 'no online users query');
+        $this->assertEmpty(array_filter(array_column($queries, 'sql'), fn ($q) => preg_match('/from users where id in \((?:\?, ){7,}\?\)/', $q)), 'no loading of the online users');
     }
 
     public function test_a_cache_hit_costs_only_loading_the_users()
@@ -171,12 +212,13 @@ class QueryCostTest extends OnlineUsersTestCase
         $repository = $this->repository(new FakeCacheAdapter());
         $actor = $this->actor(2);
 
-        $repository->getOnlineUsers($actor); // fills the cache
+        // Control: the first call is the miss, and issues the count and the ids.
+        $this->assertSame(2, $this->widgetQueries($this->queriesDuring(fn () => $repository->getOnlineUsers($actor))));
 
-        $sql = array_column($this->queriesDuring(fn () => $repository->getOnlineUsers($actor)), 'sql');
+        $hit = $this->queriesDuring(fn () => $repository->getOnlineUsers($actor));
 
-        $this->assertEmpty(array_filter($sql, fn ($q) => str_contains($q, '`last_seen_at` >')), 'the count and the ids come from the cache');
-        $this->assertCount(1, $sql, 'just the users: '.implode("\n", $sql));
+        $this->assertSame(0, $this->widgetQueries($hit), 'the count and the ids come from the cache');
+        $this->assertCount(1, $hit, 'just the users: '.implode("\n", array_column($hit, 'sql')));
     }
 
     /**
