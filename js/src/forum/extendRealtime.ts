@@ -2,7 +2,7 @@ import app from 'flarum/forum/app';
 import type { Channel } from 'pusher-js';
 import RealtimeState from 'ext:flarum/realtime/forum/RealtimeState';
 
-import onlineUsersState from '../common/onlineUsersState';
+import onlineUsersState, { type OnlineUsersState } from '../common/onlineUsersState';
 
 /**
  * Presence is used purely as an invalidation signal. The server remains the
@@ -30,58 +30,62 @@ import onlineUsersState from '../common/onlineUsersState';
  */
 
 /**
- * Channel-ready callbacks re-fire on every reconnect cycle (iOS backgrounding,
- * desktop Safari zombie sockets — see realtime's Application.ts forceReconnect),
- * each time handing over a fresh channel object. Re-binding on the new channel
- * is required; re-binding on one we already hold would stack duplicate
- * handlers, so track the channel we last bound to.
- */
-let boundChannel: Channel | null = null;
-
-const onMemberAdded = () => onlineUsersState.presenceChanged();
-
-function subscribeToPresence(): void {
-  // Nothing on screen needs keeping up to date yet, so don't announce ourselves
-  // to everyone else (and cost them a refetch) for nothing. The first widget to
-  // mount calls this again.
-  if (!onlineUsersState.wanted) return;
-
-  // Not connected yet; the channel-ready callbacks below call this once it is.
-  if (!app.websocket) return;
-
-  // Whether the server would let us in, decided by the same rule as the channel
-  // guard (guests, the widget permission, and the `discloseOnline` preference).
-  if (!app.forum.attribute<boolean>('canJoinOnlineUsersPresence')) return;
-
-  const channel: Channel = app.websocket.subscribe('presence-online');
-
-  if (channel === boundChannel) return;
-
-  // A channel after the first is a reconnect, and nothing is buffered while the
-  // socket is down, so whatever happened in the meantime was missed.
-  const reconnected = boundChannel !== null;
-
-  boundChannel = channel;
-
-  // No handler for `pusher:subscription_succeeded`: the page payload is already
-  // the server's answer, so there is nothing to correct on connect. Refetching
-  // there is what produced the visible collapse.
-  channel.bind('pusher:member_added', onMemberAdded);
-
-  if (reconnected) onlineUsersState.presenceChanged();
-}
-
-/**
  * Only called when flarum-realtime is enabled — see the guard in forum/index.ts.
  * The `ext:` import above compiles to a webpack external whose factory runs on
  * first require, so nothing is resolved on forums without realtime installed.
+ *
+ * What it tracks (the channel it last bound to) lives in this call rather than the
+ * module, so each call starts from nothing. It runs once per page; `state` is the
+ * page's shared one unless a test passes its own.
  */
-export default function extendRealtime(): void {
+export default function extendRealtime(state: OnlineUsersState = onlineUsersState): void {
   // Realtime is flagged enabled but its bundle did not load before ours (an
   // install whose extension order was not re-synced), so the import is undefined.
   if (!RealtimeState) return;
 
-  onlineUsersState.onFirstMount(subscribeToPresence);
+  /**
+   * Channel-ready callbacks re-fire on every reconnect cycle (iOS backgrounding,
+   * desktop Safari zombie sockets — see realtime's Application.ts forceReconnect),
+   * each time handing over a fresh channel object. Re-binding on the new channel
+   * is required; re-binding on one we already hold would stack duplicate
+   * handlers, so track the channel we last bound to.
+   */
+  let boundChannel: Channel | null = null;
+
+  const onMemberAdded = () => state.presenceChanged();
+
+  function subscribeToPresence(): void {
+    // Nothing on screen needs keeping up to date yet, so don't announce ourselves
+    // to everyone else (and cost them a refetch) for nothing. The first widget to
+    // mount calls this again.
+    if (!state.wanted) return;
+
+    // Not connected yet; the channel-ready callbacks below call this once it is.
+    if (!app.websocket) return;
+
+    // Whether the server would let us in, decided by the same rule as the channel
+    // guard (guests, the widget permission, and the `discloseOnline` preference).
+    if (!app.forum.attribute<boolean>('canJoinOnlineUsersPresence')) return;
+
+    const channel: Channel = app.websocket.subscribe('presence-online');
+
+    if (channel === boundChannel) return;
+
+    // A channel after the first is a reconnect, and nothing is buffered while the
+    // socket is down, so whatever happened in the meantime was missed.
+    const reconnected = boundChannel !== null;
+
+    boundChannel = channel;
+
+    // No handler for `pusher:subscription_succeeded`: the page payload is already
+    // the server's answer, so there is nothing to correct on connect. Refetching
+    // there is what produced the visible collapse.
+    channel.bind('pusher:member_added', onMemberAdded);
+
+    if (reconnected) state.presenceChanged();
+  }
+
+  state.onFirstMount(subscribeToPresence);
 
   // Logged-in users get a private user channel; guests get the public one.
   // Either firing means Pusher is connected and app.forum is populated.
