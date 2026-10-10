@@ -19,6 +19,10 @@ use Illuminate\Database\Eloquent\Builder;
 
 class UserRepository
 {
+    public const DEFAULT_MAX_USERS = 15;
+    public const DEFAULT_CACHE_TTL = 30;
+    public const DEFAULT_LAST_SEEN_INTERVAL = 5;
+
     /**
      * @var array<callable(User): string>
      */
@@ -33,13 +37,41 @@ class UserRepository
     {
     }
 
-    protected function cacheKey(User $actor): string
+    /**
+     * An integer setting, falling back to its default when it is blank or not a
+     * number (an admin clearing the field stores ''), and never below `$min`.
+     */
+    protected function intSetting(string $key, int $default, int $min): int
+    {
+        $value = $this->settings->get($key);
+
+        return is_numeric($value) ? max($min, (int) $value) : $default;
+    }
+
+    /**
+     * Which users the actor can see, as far as the cached result is concerned.
+     *
+     * Core's user visibility scope shows everyone to anyone who can `viewForum`.
+     * Without it a guest sees nobody and a member sees only themselves, so the
+     * visible set is then specific to the actor and cannot be shared.
+     */
+    protected function visibilityScope(User $actor): string
+    {
+        if ($actor->can('viewForum')) {
+            return 'forum';
+        }
+
+        return $actor->isGuest() ? 'none' : 'self-'.$actor->id;
+    }
+
+    protected function cacheKey(User $actor, int $limit, int $ttl, int $interval): string
     {
         $params = [
+            $this->visibilityScope($actor),
             $actor->hasPermission('user.viewLastSeenAt') ? 'high-access' : 'low-access',
-            $this->settings->get('fof-online-users-widget.max_users'),
-            $this->settings->get('fof-online-users-widget.cache_ttl'),
-            $this->settings->get('fof-online-users-widget.last_seen_interval'),
+            $limit,
+            $ttl,
+            $interval,
         ];
 
         foreach (static::$cacheKeyParameters as $parameter) {
@@ -65,37 +97,45 @@ class UserRepository
      */
     public function getOnlineUserIds(User $actor): array
     {
-        $limit = (int) $this->settings->get('fof-online-users-widget.max_users');
-        $ttl = (int) $this->settings->get('fof-online-users-widget.cache_ttl');
-        $interval = (int) $this->settings->get('fof-online-users-widget.last_seen_interval');
+        $limit = $this->intSetting('fof-online-users-widget.max_users', self::DEFAULT_MAX_USERS, 1);
+        $ttl = $this->intSetting('fof-online-users-widget.cache_ttl', self::DEFAULT_CACHE_TTL, 0);
+        $interval = $this->intSetting('fof-online-users-widget.last_seen_interval', self::DEFAULT_LAST_SEEN_INTERVAL, 1);
 
-        $result = $this->cache->remember(
-            $this->cacheKey($actor),
+        // The adapter returns null, without running the callback, when it cannot
+        // cache (storage/cache not writable). That is a cache miss, not "nobody
+        // is online".
+        return $this->cache->remember(
+            $this->cacheKey($actor, $limit, $ttl, $interval),
             $ttl,
-            function () use ($actor, $limit, $interval) {
-                $query = User::query()
-                    ->select('id', 'preferences')
-                    ->whereVisibleTo($actor)
-                    ->where('last_seen_at', '>', Carbon::now()->subMinutes($interval));
+            fn () => $this->queryOnlineUserIds($actor, $limit, $interval)
+        ) ?? $this->queryOnlineUserIds($actor, $limit, $interval);
+    }
 
-                // user.viewLastSeenAt is a permission that allows viewing online state
-                // regardless of the privacy preference not to be shown. Applied in SQL
-                // so that the count and the list agree — counting before filtering
-                // would let a viewer infer how many users had opted out.
-                if (! $actor->hasPermission('user.viewLastSeenAt')) {
-                    $this->whereDisclosesOnline($query);
-                }
+    /**
+     * @return array{users: int[], count: int}
+     */
+    protected function queryOnlineUserIds(User $actor, int $limit, int $interval): array
+    {
+        $query = User::query()
+            ->whereVisibleTo($actor)
+            ->where('last_seen_at', '>', Carbon::now()->subMinutes($interval));
 
-                $count = $query->count();
+        // user.viewLastSeenAt is a permission that allows viewing online state
+        // regardless of the privacy preference not to be shown. Applied in SQL
+        // so that the count and the list agree — counting before filtering
+        // would let a viewer infer how many users had opted out.
+        if (! $actor->hasPermission('user.viewLastSeenAt')) {
+            $this->whereDisclosesOnline($query);
+        }
 
-                return [
-                    'users' => $query->limit($limit)->pluck('id')->all(),
-                    'count' => $count,
-                ];
-            }
-        );
+        $count = $query->count();
 
-        return $result ?: ['users' => [], 'count' => 0];
+        return [
+            // Without an order the cap picks an arbitrary N users, and which ones
+            // can change from one request to the next.
+            'users' => $query->orderByDesc('last_seen_at')->orderBy('id')->limit($limit)->pluck('id')->all(),
+            'count' => $count,
+        ];
     }
 
     /**
@@ -131,16 +171,25 @@ class UserRepository
             return ['users' => [], 'count' => $online['count']];
         }
 
-        return [
-            // Re-checked against the visibility scope rather than trusting the
-            // cached ids, so a visibility change takes effect immediately
-            // instead of after cache_ttl.
-            'users' => User::query()
-                ->whereVisibleTo($actor)
-                ->whereIn('id', $online['users'])
-                ->get()
-                ->all(),
-            'count' => $online['count'],
-        ];
+        // Re-checked against the visibility scope rather than trusting the
+        // cached ids, so a visibility change takes effect immediately instead of
+        // after cache_ttl.
+        $visible = User::query()
+            ->whereVisibleTo($actor)
+            ->whereIn('id', $online['users'])
+            ->get()
+            ->keyBy('id');
+
+        $users = [];
+
+        // `whereIn` returns rows in whatever order the database likes; restore
+        // the order the ids were ranked in.
+        foreach ($online['users'] as $id) {
+            if ($user = $visible->get($id)) {
+                $users[] = $user;
+            }
+        }
+
+        return ['users' => $users, 'count' => $online['count']];
     }
 }

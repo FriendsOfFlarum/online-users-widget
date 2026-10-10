@@ -38,7 +38,8 @@ class EnableExtensionTest extends TestCase
 
         $attributes = json_decode($response->getBody()->getContents(), true)['data']['attributes'];
 
+        // Always present, so the client can tell whether to show the widget.
+        // The online data itself is permission-gated: see ForumPayloadAccessTest.
         $this->assertArrayHasKey('canViewOnlineUsersWidget', $attributes);
-        $this->assertArrayHasKey('totalOnlineUsers', $attributes);
     }
 }
