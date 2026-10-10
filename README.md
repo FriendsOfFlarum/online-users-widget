@@ -107,7 +107,7 @@ return [
 
 ## Troubleshooting
 
-- **The widget does not appear.** Check that **View Online Users Widget** has been granted to the viewer's group (it is not granted to anyone by default), and that Forum Widgets Core has it in a placement. Forum Widgets Core only draws widgets on the discussion list's page, so a forum whose home page is another route may not show it; see [forum-widgets-core#14](https://github.com/FriendsOfFlarum/forum-widgets-core/issues/14).
+- **The widget does not appear.** Check that **View Online Users Widget** has been granted to the viewer's group (it is not granted to anyone by default), and that Forum Widgets Core has it in a placement. Forum Widgets Core shows widgets on the discussion list (all discussions, a tag, following) and on any page that extends `IndexPage`. A page added by another extension, such as a categories page, shows them only if that extension opts the page in; see "Showing widgets on your own page" in the Forum Widgets Core [README](https://github.com/FriendsOfFlarum/forum-widgets-core).
 - **Nobody is listed, but people are online.** They may have opted out (see above), or this viewer may not be allowed to see them.
 - **The list is a little behind.** It is cached for the configured time. Lower **Time to cache**, or install flarum/realtime.
 
