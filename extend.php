@@ -42,7 +42,11 @@ $resolve = function (Context $context) use ($memo): array {
         return ['users' => [], 'count' => 0];
     }
 
-    return $memo[$context->request] ??= resolve(UserRepository::class)->getOnlineUsers($actor);
+    // Sent by the client after a realtime membership event, when the cached
+    // answer is likely to be out of date. See UserRepository::FRESH_WINDOW.
+    $fresh = (bool) $context->queryParam('onlineUsersFresh');
+
+    return $memo[$context->request] ??= resolve(UserRepository::class)->getOnlineUsers($actor, $fresh);
 };
 
 return [
@@ -51,15 +55,20 @@ return [
         ->css(__DIR__.'/less/forum.less'),
 
     (new Extend\Frontend('admin'))
-        ->js(__DIR__.'/js/dist/admin.js')
-        ->css(__DIR__.'/less/admin.less'),
+        ->js(__DIR__.'/js/dist/admin.js'),
 
     new Extend\Locales(__DIR__.'/locale'),
 
     (new Extend\ApiResource(Resource\ForumResource::class))
         ->fields(fn () => [
             Schema\Boolean::make('canViewOnlineUsersWidget')
-                ->get(fn ($model, Context $context) => $context->getActor()->hasPermission('viewOnlineUsersWidget')),
+                ->get(fn ($model, Context $context) => Access::canView($context->getActor())),
+
+            // Whether the client should join `presence-online`. Decided here, by
+            // the same rule the channel guard below applies, so the two cannot
+            // disagree.
+            Schema\Boolean::make('canJoinOnlineUsersPresence')
+                ->get(fn ($model, Context $context) => Access::canJoinPresence($context->getActor())),
 
             // Omitted, not zeroed, for actors without the permission: `onlineUsers`
             // is a default include, so these reach every actor's `GET /api` and

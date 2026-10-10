@@ -86,4 +86,51 @@ class ForumPayloadAccessTest extends OnlineUsersTestCase
         $this->assertEquals(2, $document['data']['attributes']['totalOnlineUsers']);
         $this->assertCount(2, $document['data']['relationships']['onlineUsers']['data']);
     }
+
+    public function test_a_partial_include_returns_only_the_online_users()
+    {
+        $this->grant('viewOnlineUsersWidget', Group::MEMBER_ID);
+
+        $response = $this->send(
+            $this->request('GET', '/api', ['authenticatedAs' => 2])->withQueryParams(['include' => 'onlineUsers'])
+        );
+
+        $this->assertEquals(200, $response->getStatusCode(), (string) $response->getBody());
+
+        $document = json_decode((string) $response->getBody(), true);
+
+        $this->assertEquals(2, $document['data']['attributes']['totalOnlineUsers']);
+        $this->assertCount(2, $document['data']['relationships']['onlineUsers']['data']);
+
+        $includedTypes = array_unique(array_column($document['included'] ?? [], 'type'));
+        $this->assertEquals(['users'], array_values($includedTypes), 'nothing but the online users is serialized');
+    }
+
+    public function test_the_fresh_marker_is_accepted()
+    {
+        $this->grant('viewOnlineUsersWidget', Group::MEMBER_ID);
+
+        $response = $this->send(
+            $this->request('GET', '/api', ['authenticatedAs' => 2])->withQueryParams(['include' => 'onlineUsers', 'onlineUsersFresh' => '1'])
+        );
+
+        $this->assertEquals(200, $response->getStatusCode(), (string) $response->getBody());
+        $this->assertEquals(2, json_decode((string) $response->getBody(), true)['data']['attributes']['totalOnlineUsers']);
+    }
+
+    public function test_the_forum_says_whether_the_actor_may_join_presence()
+    {
+        $this->grant('viewOnlineUsersWidget', Group::MEMBER_ID);
+        $this->prepareDatabase([User::class => [$this->user(4, 1, ['preferences' => ['discloseOnline' => false]])]]);
+
+        $this->assertTrue($this->forumDocument(2)['data']['attributes']['canJoinOnlineUsersPresence']);
+        $this->assertFalse($this->forumDocument(4)['data']['attributes']['canJoinOnlineUsersPresence']);
+    }
+
+    public function test_a_guest_never_joins_presence()
+    {
+        $this->grant('viewOnlineUsersWidget', Group::GUEST_ID);
+
+        $this->assertFalse($this->forumDocument()['data']['attributes']['canJoinOnlineUsersPresence']);
+    }
 }
