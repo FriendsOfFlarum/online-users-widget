@@ -60,6 +60,32 @@ class AfruxSettingMigrationTest extends TestCase
         $this->assertNull($this->storedValue(self::NEW_KEY));
     }
 
+    public function test_an_existing_fof_value_wins_and_the_migration_does_not_collide()
+    {
+        $this->prepareDatabase(['settings' => [
+            ['key' => self::OLD_KEY, 'value' => '42'],
+            ['key' => self::NEW_KEY, 'value' => '7'],
+        ]]);
+
+        $this->runMigration('up');
+
+        $this->assertEquals('7', $this->storedValue(self::NEW_KEY));
+        $this->assertEquals('42', $this->storedValue(self::OLD_KEY));
+    }
+
+    public function test_down_does_not_collide_with_an_existing_afrux_value()
+    {
+        $this->prepareDatabase(['settings' => [
+            ['key' => self::OLD_KEY, 'value' => '42'],
+            ['key' => self::NEW_KEY, 'value' => '7'],
+        ]]);
+
+        $this->runMigration('down');
+
+        $this->assertEquals('7', $this->storedValue(self::NEW_KEY));
+        $this->assertEquals('42', $this->storedValue(self::OLD_KEY));
+    }
+
     public function test_down_restores_the_afrux_key()
     {
         $this->prepareDatabase(['settings' => [['key' => self::OLD_KEY, 'value' => '42']]]);

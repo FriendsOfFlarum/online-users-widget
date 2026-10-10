@@ -11,18 +11,31 @@
 
 use Illuminate\Database\Schema\Builder;
 
+/**
+ * Renames the Afrux setting key to ours, and back.
+ *
+ * `settings.key` is the primary key, so a rename onto a key that already exists
+ * throws and aborts `migrate` (and enabling the extension). That happens when
+ * both rows exist — settings synced from another environment, or `down` and `up`
+ * run again after the value was changed. The key already in place wins and the
+ * other row is left untouched, rather than overwriting or deleting a value.
+ */
+$rename = function (Builder $schema, string $from, string $to): void {
+    $settings = $schema->getConnection()->table('settings');
+
+    if ($settings->clone()->where('key', $to)->exists()) {
+        return;
+    }
+
+    $settings->where('key', $from)->update(['key' => $to]);
+};
+
 return [
-    'up' => function (Builder $schema) {
-        $schema->getConnection()
-            ->table('settings')
-            ->where('key', 'afrux-online-users-widget.max_users')
-            ->update(['key' => 'fof-online-users-widget.max_users']);
+    'up' => function (Builder $schema) use ($rename) {
+        $rename($schema, 'afrux-online-users-widget.max_users', 'fof-online-users-widget.max_users');
     },
 
-    'down' => function (Builder $schema) {
-        $schema->getConnection()
-            ->table('settings')
-            ->where('key', 'fof-online-users-widget.max_users')
-            ->update(['key' => 'afrux-online-users-widget.max_users']);
+    'down' => function (Builder $schema) use ($rename) {
+        $rename($schema, 'fof-online-users-widget.max_users', 'afrux-online-users-widget.max_users');
     },
 ];

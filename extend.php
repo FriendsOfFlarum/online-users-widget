@@ -17,6 +17,7 @@ use Flarum\Api\Resource;
 use Flarum\Api\Schema;
 use Flarum\Extend;
 use Flarum\User\User;
+use WeakMap;
 
 /**
  * Resolve the online users once per request.
@@ -26,15 +27,22 @@ use Flarum\User\User;
  *
  * Memoized in a local rather than on the Context: the serializer hands each
  * field its own Context (`withField()` clones), so `setParam()` writes would
- * not be visible to the sibling field. Keyed by actor so nothing leaks between
- * actors should the closure outlive one request.
+ * not be visible to the sibling field. Keyed by the request object, which every
+ * cloned Context shares, so the entry cannot outlive the request in a
+ * long-running worker and is released with it.
  */
-$memo = [];
+$memo = new WeakMap();
 
-$resolve = function (Context $context) use (&$memo): array {
+$resolve = function (Context $context) use ($memo): array {
     $actor = $context->getActor();
 
-    return $memo[$actor->id ?? 'guest'] ??= resolve(UserRepository::class)->getOnlineUsers($actor);
+    // The fields below are not visible without this permission, so this is
+    // belt and braces: no query should ever run for an actor who cannot see it.
+    if (! Access::canView($actor)) {
+        return ['users' => [], 'count' => 0];
+    }
+
+    return $memo[$context->request] ??= resolve(UserRepository::class)->getOnlineUsers($actor);
 };
 
 return [
@@ -53,12 +61,17 @@ return [
             Schema\Boolean::make('canViewOnlineUsersWidget')
                 ->get(fn ($model, Context $context) => $context->getActor()->hasPermission('viewOnlineUsersWidget')),
 
+            // Omitted, not zeroed, for actors without the permission: `onlineUsers`
+            // is a default include, so these reach every actor's `GET /api` and
+            // the page payload unless the API itself withholds them.
             Schema\Integer::make('totalOnlineUsers')
+                ->visible(fn ($model, Context $context) => Access::canView($context->getActor()))
                 ->get(fn ($model, Context $context) => $resolve($context)['count']),
 
             Schema\Relationship\ToMany::make('onlineUsers')
                 ->type('users')
                 ->includable()
+                ->visible(fn ($model, Context $context) => Access::canView($context->getActor()))
                 ->get(fn ($model, Context $context) => $resolve($context)['users']),
         ])
         ->endpoint(Endpoint\Show::class, fn (Endpoint\Show $endpoint) => $endpoint->addDefaultInclude(['onlineUsers'])),
@@ -66,18 +79,19 @@ return [
     // Without this guard any logged-in user could subscribe to `presence-online`
     // and enumerate who is connected, regardless of the permission the widget
     // itself enforces. Realtime's own docblock for this hook uses this very
-    // permission as its worked example.
+    // permission as its worked example. Joining also announces the subscriber
+    // to the others, so it respects `discloseOnline` — see Access.
     (new Extend\Conditional())
         ->whenExtensionEnabled('flarum-realtime', fn () => [
             (new \Flarum\Realtime\Extend\Realtime())
                 ->authorizePresenceChannel(
                     'online',
-                    fn (User $actor) => $actor->hasPermission('viewOnlineUsersWidget')
+                    fn (User $actor) => Access::canJoinPresence($actor)
                 ),
         ]),
 
     (new Extend\Settings())
-        ->default('fof-online-users-widget.max_users', 15)
-        ->default('fof-online-users-widget.cache_ttl', 30)
-        ->default('fof-online-users-widget.last_seen_interval', 5),
+        ->default('fof-online-users-widget.max_users', UserRepository::DEFAULT_MAX_USERS)
+        ->default('fof-online-users-widget.cache_ttl', UserRepository::DEFAULT_CACHE_TTL)
+        ->default('fof-online-users-widget.last_seen_interval', UserRepository::DEFAULT_LAST_SEEN_INTERVAL),
 ];
