@@ -24,6 +24,16 @@ class UserRepository
     public const DEFAULT_LAST_SEEN_INTERVAL = 5;
 
     /**
+     * Seconds that fresh requests share one cache entry for.
+     *
+     * Deliberately no longer than the client's minimum delay between a realtime
+     * event and the refetch it triggers (`MIN_DELAY` in onlineUsersState.ts): a
+     * refetch is then always at least one window after the event, so the entry
+     * it lands on was computed after the event rather than before it.
+     */
+    public const FRESH_WINDOW = 2;
+
+    /**
      * @var array<callable(User): string>
      */
     protected static array $cacheKeyParameters = [];
@@ -64,10 +74,15 @@ class UserRepository
         return $actor->isGuest() ? 'none' : 'self-'.$actor->id;
     }
 
-    protected function cacheKey(User $actor, int $limit, int $ttl, int $interval): string
+    protected function cacheKey(User $actor, int $limit, int $ttl, int $interval, bool $fresh): string
     {
         $params = [
             $this->visibilityScope($actor),
+            // Fresh requests skip the normal entry, which may be up to `cache_ttl`
+            // old, but not the cache: they share a short window, so a burst of them
+            // — every subscriber reacting to one event, or a client hammering the
+            // marker — costs one query per window rather than one each.
+            $fresh ? 'fresh-'.intdiv(Carbon::now()->getTimestamp(), self::FRESH_WINDOW) : 'normal',
             $actor->hasPermission('user.viewLastSeenAt') ? 'high-access' : 'low-access',
             $limit,
             $ttl,
@@ -93,9 +108,11 @@ class UserRepository
      * online, and using it would shrink the list rather than sharpen it.
      * Realtime instead refetches this result when membership changes.
      *
+     * @param bool $fresh Bypass the normal cache entry; see {@see FRESH_WINDOW}.
+     *
      * @return array{users: int[], count: int}
      */
-    public function getOnlineUserIds(User $actor): array
+    public function getOnlineUserIds(User $actor, bool $fresh = false): array
     {
         $limit = $this->intSetting('fof-online-users-widget.max_users', self::DEFAULT_MAX_USERS, 1);
         $ttl = $this->intSetting('fof-online-users-widget.cache_ttl', self::DEFAULT_CACHE_TTL, 0);
@@ -105,7 +122,7 @@ class UserRepository
         // cache (storage/cache not writable). That is a cache miss, not "nobody
         // is online".
         return $this->cache->remember(
-            $this->cacheKey($actor, $limit, $ttl, $interval),
+            $this->cacheKey($actor, $limit, $ttl, $interval, $fresh),
             $ttl,
             fn () => $this->queryOnlineUserIds($actor, $limit, $interval)
         ) ?? $this->queryOnlineUserIds($actor, $limit, $interval);
@@ -163,9 +180,9 @@ class UserRepository
     /**
      * @return array{users: User[], count: int}
      */
-    public function getOnlineUsers(User $actor): array
+    public function getOnlineUsers(User $actor, bool $fresh = false): array
     {
-        $online = $this->getOnlineUserIds($actor);
+        $online = $this->getOnlineUserIds($actor, $fresh);
 
         if (empty($online['users'])) {
             return ['users' => [], 'count' => $online['count']];

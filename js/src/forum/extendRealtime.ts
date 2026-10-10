@@ -1,5 +1,4 @@
 import app from 'flarum/forum/app';
-import { debounce } from 'flarum/common/utils/throttleDebounce';
 import type { Channel } from 'pusher-js';
 import RealtimeState from 'ext:flarum/realtime/forum/RealtimeState';
 
@@ -23,45 +22,12 @@ import onlineUsersState from '../common/onlineUsersState';
  * preference (the presence payload carries only a display name), and cannot
  * apply the `max_users` cap the `+N` chip is derived from.
  *
- * So membership changes only tell us "something moved, ask again". The rendered
- * list is always the server's answer, which means it never changes definition
- * underneath the viewer.
+ * So membership changes only tell us "something moved, ask again" — see
+ * onlineUsersState.ts for when and how. Only arrivals are listened for: the
+ * server defines "online" as recently seen, so someone leaving the channel does
+ * not make them stop being online, and a refetch for it would return the same
+ * list.
  */
-
-/**
- * Refetch the forum resource, which carries `onlineUsers` and
- * `totalOnlineUsers` as a default include.
- *
- * `store.find('forum')` cannot be used: it would build `apiUrl + '/forum'`,
- * whereas the forum resource is served from the API root (`GET /`, see
- * ForumResource::endpoints()). Pushing the payload replaces the `onlineUsers`
- * relationship wholesale rather than merging into it, so users correctly
- * disappear once the server stops returning them.
- */
-async function refetchOnlineUsers(): Promise<void> {
-  onlineUsersState.isLoading = true;
-
-  try {
-    const payload = await app.request<any>({
-      method: 'GET',
-      url: app.forum.attribute<string>('apiUrl') + '/',
-    });
-
-    app.store.pushPayload(payload);
-  } finally {
-    onlineUsersState.isLoading = false;
-    m.redraw();
-  }
-}
-
-/**
- * Membership churn arrives one event per user and a single navigation can
- * produce several in a row, so coalesce them into one request. The server-side
- * cache (`cache_ttl`) absorbs the rest.
- */
-const scheduleRefetch = debounce(2000, () => {
-  refetchOnlineUsers();
-});
 
 /**
  * Channel-ready callbacks re-fire on every reconnect cycle (iOS backgrounding,
@@ -72,23 +38,37 @@ const scheduleRefetch = debounce(2000, () => {
  */
 let boundChannel: Channel | null = null;
 
-function subscribeToPresence(): void {
-  // Presence auth refuses guests outright, so there is nothing to subscribe to.
-  if (!app.session.user) return;
+const onMemberAdded = () => onlineUsersState.presenceChanged();
 
-  if (!app.forum.attribute<boolean>('canViewOnlineUsersWidget')) return;
+function subscribeToPresence(): void {
+  // Nothing on screen needs keeping up to date yet, so don't announce ourselves
+  // to everyone else (and cost them a refetch) for nothing. The first widget to
+  // mount calls this again.
+  if (!onlineUsersState.wanted) return;
+
+  // Not connected yet; the channel-ready callbacks below call this once it is.
+  if (!app.websocket) return;
+
+  // Whether the server would let us in, decided by the same rule as the channel
+  // guard (guests, the widget permission, and the `discloseOnline` preference).
+  if (!app.forum.attribute<boolean>('canJoinOnlineUsersPresence')) return;
 
   const channel: Channel = app.websocket.subscribe('presence-online');
 
   if (channel === boundChannel) return;
+
+  // A channel after the first is a reconnect, and nothing is buffered while the
+  // socket is down, so whatever happened in the meantime was missed.
+  const reconnected = boundChannel !== null;
 
   boundChannel = channel;
 
   // No handler for `pusher:subscription_succeeded`: the page payload is already
   // the server's answer, so there is nothing to correct on connect. Refetching
   // there is what produced the visible collapse.
-  channel.bind('pusher:member_added', scheduleRefetch);
-  channel.bind('pusher:member_removed', scheduleRefetch);
+  channel.bind('pusher:member_added', onMemberAdded);
+
+  if (reconnected) onlineUsersState.presenceChanged();
 }
 
 /**
@@ -97,6 +77,12 @@ function subscribeToPresence(): void {
  * first require, so nothing is resolved on forums without realtime installed.
  */
 export default function extendRealtime(): void {
+  // Realtime is flagged enabled but its bundle did not load before ours (an
+  // install whose extension order was not re-synced), so the import is undefined.
+  if (!RealtimeState) return;
+
+  onlineUsersState.onFirstMount(subscribeToPresence);
+
   // Logged-in users get a private user channel; guests get the public one.
   // Either firing means Pusher is connected and app.forum is populated.
   RealtimeState.onUserChannelReady(subscribeToPresence);

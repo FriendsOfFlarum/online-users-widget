@@ -7,19 +7,14 @@
   &-item {
     margin: 2px;
 
+    // Core's .Avatar already sizes itself from --size and centres its content.
     .Avatar {
       --size: 35px;
-      width: var(--size);
-      height: var(--size);
-      font-size: calc(~"var(--size) / 2");
-      display: inline-flex;
-      justify-content: center;
-      align-items: center;
     }
 
     &--plus .Avatar {
-      background-color: var(--body-bg);
-      color: var(--control-color);
+      background-color: var(--control-bg);
+      color: var(--text-color);
       font-size: 13px;
     }
   }

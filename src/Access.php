@@ -39,7 +39,8 @@ class Access
      */
     public static function canJoinPresence(User $actor): bool
     {
-        return static::canView($actor)
+        return ! $actor->isGuest()
+            && static::canView($actor)
             && ($actor->getPreference('discloseOnline') || $actor->hasPermission('user.viewLastSeenAt'));
     }
 }
