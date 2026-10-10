@@ -83,7 +83,7 @@ return [
                 ->visible(fn ($model, Context $context) => Access::canView($context->getActor()))
                 ->get(fn ($model, Context $context) => $resolve($context)['users']),
         ])
-        ->endpoint(Endpoint\Show::class, fn (Endpoint\Show $endpoint) => $endpoint->addDefaultInclude(['onlineUsers'])),
+        ->endpoint(Endpoint\Show::class, fn (Endpoint\Show $endpoint) => $endpoint->addDefaultInclude(['onlineUsers', 'onlineUsers.groups'])),
 
     // Without this guard any logged-in user could subscribe to `presence-online`
     // and enumerate who is connected, regardless of the permission the widget

@@ -8,6 +8,14 @@ import app from 'flarum/common/app';
 const STALE_AFTER = 30_000;
 
 /**
+ * What a refetch asks for: the users, and their groups. A click on one of them opens
+ * a profile that core renders from the store without fetching, so the group badges
+ * have to arrive with the user. Keep in step with the forum resource's default
+ * includes in extend.php.
+ */
+const INCLUDE = 'onlineUsers,onlineUsers.groups';
+
+/**
  * Delay between a presence event and the refetch it triggers: a random value in
  * [MIN_DELAY, MIN_DELAY + SPREAD). The random part stops every subscriber asking
  * in the same instant. MIN_DELAY must not be shorter than the server's
@@ -135,8 +143,8 @@ export class OnlineUsersState {
    * replaces the `onlineUsers` relationship wholesale rather than merging into
    * it, so users correctly disappear once the server stops returning them.
    *
-   * `include` is narrowed so the response carries only the online users, not the
-   * forum's other default includes.
+   * `include` is narrowed so the response carries only the online users and their
+   * groups, not the forum's other default includes.
    *
    * This runs in the background, so a failure is swallowed rather than alerting
    * the user about something they did not ask for; the list simply stays as it
@@ -153,7 +161,7 @@ export class OnlineUsersState {
       const payload = await app.request<any>({
         method: 'GET',
         url: app.forum.attribute<string>('apiUrl') + '/',
-        params: fresh ? { include: 'onlineUsers', onlineUsersFresh: 1 } : { include: 'onlineUsers' },
+        params: fresh ? { include: INCLUDE, onlineUsersFresh: 1 } : { include: INCLUDE },
         errorHandler: () => {},
       });
 

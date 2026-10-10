@@ -194,6 +194,12 @@ class UserRepository
         $visible = User::query()
             ->whereVisibleTo($actor)
             ->whereIn('id', $online['users'])
+            // The profile a click on one of these users opens is rendered from the
+            // store, so the groups have to arrive with the user (core serializes them
+            // from the loaded relation). Loaded here, once for all of them: left lazy,
+            // each user would be a query of its own — for the `groups` field, and for
+            // any policy check that reads `isAdmin()`.
+            ->with('groups')
             ->get()
             ->keyBy('id');
 
