@@ -92,6 +92,5 @@
         "test:setup": "Sets up a database for use with integration tests. Execute this only once.",
         "analyse:phpstan": "Run static analysis"
     },
-    "minimum-stability": "beta",
     "prefer-stable": true
 }
