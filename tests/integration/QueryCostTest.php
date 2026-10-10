@@ -16,17 +16,16 @@ use Flarum\User\User;
 use FoF\OnlineUsers\Tests\Support\FakeCacheAdapter;
 
 /**
- * Clicking an avatar in the widget opens that user's profile. Core's profile page
- * reuses any user already in the store that has `joinTime`, and only fetches
- * `/users/{slug}` when there is none — so the online users have to arrive with
- * everything the profile renders from the store, or it renders without it until
- * a refresh. The group badges come from the `groups` relationship.
+ * What a request costs, and that it does not grow with the number of online users.
  *
- * It must also cost nothing per user: `groups` is read from the loaded relation,
- * so without eager loading each online user is a query of their own. The query
- * tests below pin that, and the rest of what a request costs.
+ * The online users are serialized by core's user resource, so anything it reads per
+ * user (a relation, a policy that checks `isAdmin()`) is a query per online user
+ * unless something loads it for all of them at once. The fixtures put the users in
+ * groups, which is what such a read would hit. `flarum/testing` also fails any
+ * request that repeats one query shape per record; these tests pin the totals on top
+ * of that, since the detector's threshold hides small counts.
  */
-class OnlineUserGroupsTest extends OnlineUsersTestCase
+class QueryCostTest extends OnlineUsersTestCase
 {
     protected const VIP = 5;
     protected const HIDDEN = 6;
@@ -90,33 +89,6 @@ class OnlineUserGroupsTest extends OnlineUsersTestCase
     }
 
     /**
-     * Group ids linked from each online user, keyed by user id.
-     *
-     * @return array<string, string[]>
-     */
-    protected function groupsByUser(array $document): array
-    {
-        $online = array_column($document['data']['relationships']['onlineUsers']['data'], 'id');
-        $byId = [];
-
-        foreach ($document['included'] ?? [] as $resource) {
-            // The actor's own request can mark them as online too; they are not what is under test.
-            if ($resource['type'] === 'users' && $resource['id'] !== '2' && in_array($resource['id'], $online, true)) {
-                $this->assertArrayHasKey('groups', $resource['relationships'] ?? [], "user {$resource['id']} carries no groups relationship");
-                $this->assertArrayHasKey('data', $resource['relationships']['groups'], "user {$resource['id']} carries no groups linkage");
-
-                $ids = array_column($resource['relationships']['groups']['data'], 'id');
-                sort($ids);
-                $byId[$resource['id']] = $ids;
-            }
-        }
-
-        ksort($byId);
-
-        return $byId;
-    }
-
-    /**
      * Run `$request`, returning the queries it issued.
      *
      * @return array<array{sql: string, bindings: array}>
@@ -138,43 +110,6 @@ class OnlineUserGroupsTest extends OnlineUsersTestCase
         return $this->queries;
     }
 
-    public function test_the_boot_payload_carries_each_online_users_groups()
-    {
-        $this->seedOnlineUsers(4);
-
-        $groups = $this->groupsByUser($this->forumDocument());
-
-        $this->assertEquals([
-            '10' => ['4', '5'],  // moderator and VIP; the hidden group is not shown
-            '11' => [],          // in none, which is still linkage: an empty list, not absent
-            '12' => ['5'],
-            '13' => ['4'],
-        ], $groups);
-    }
-
-    public function test_a_refetch_carries_the_groups_too()
-    {
-        $this->seedOnlineUsers(4);
-
-        $document = $this->forumDocument(2, ['include' => 'onlineUsers,onlineUsers.groups']);
-
-        $this->assertCount(4, $this->groupsByUser($document));
-    }
-
-    public function test_hidden_groups_are_not_exposed_to_actors_who_cannot_see_them()
-    {
-        $this->seedOnlineUsers(1);
-
-        $this->assertNotContains((string) self::HIDDEN, $this->groupsByUser($this->forumDocument(2))['10']);
-    }
-
-    public function test_hidden_groups_are_shown_to_actors_who_can_see_them()
-    {
-        $this->seedOnlineUsers(1);
-
-        $this->assertContains((string) self::HIDDEN, $this->groupsByUser($this->forumDocument(1))['10']);
-    }
-
     public function test_queries_do_not_grow_with_the_number_of_online_users()
     {
         $this->seedOnlineUsers(3);
@@ -191,7 +126,7 @@ class OnlineUserGroupsTest extends OnlineUsersTestCase
     public function test_the_refetch_does_not_grow_either()
     {
         $this->seedOnlineUsers(3);
-        $query = ['include' => 'onlineUsers,onlineUsers.groups'];
+        $query = ['include' => 'onlineUsers'];
 
         $this->forumDocument(2, $query); // the first request pays one-off boot queries
         $few = count($this->queriesDuring(fn () => $this->forumDocument(2, $query)));
@@ -214,12 +149,7 @@ class OnlineUserGroupsTest extends OnlineUsersTestCase
         // The total and the list are two fields over one result.
         $this->assertEquals(1, $widget('count(*) as `aggregate` from `users` where `last_seen_at`'), 'the count');
         $this->assertEquals(1, $widget('select `id` from `users` where'), 'the ids');
-
-        // One load of the groups for all eight online users together, as opposed to the
-        // actor's own groups, which are a lookup for a single id. Eloquent inlines the
-        // integer ids of an eager load, so they are counted in the IN list.
-        $forMany = array_filter($sqlOf, fn ($sql) => preg_match('/`group_user`\.`user_id` in \((?:\d+, ){7,}\d+\)/', $sql));
-        $this->assertCount(1, $forMany, 'the groups of the online users, loaded together');
+        $this->assertEquals(1, $widget('from `users` where `id` in'), 'the users, loaded together');
     }
 
     public function test_an_actor_without_the_permission_costs_no_widget_queries()
@@ -231,10 +161,10 @@ class OnlineUserGroupsTest extends OnlineUsersTestCase
         $sql = array_column($this->queriesDuring(fn () => $this->forumDocument()), 'sql');
 
         $this->assertEmpty(array_filter($sql, fn ($q) => str_contains($q, '`last_seen_at` >')), 'no online users query');
-        $this->assertEmpty(array_filter($sql, fn ($q) => str_contains($q, '`group_user`.`user_id` in')), 'no groups load for the online users');
+        $this->assertEmpty(array_filter($sql, fn ($q) => preg_match('/from `users` where `id` in \((?:\?, ){7,}\?\)/', $q)), 'no loading of the online users');
     }
 
-    public function test_a_cache_hit_costs_only_loading_the_users_and_their_groups()
+    public function test_a_cache_hit_costs_only_loading_the_users()
     {
         $this->seedOnlineUsers(8);
 
@@ -246,7 +176,7 @@ class OnlineUserGroupsTest extends OnlineUsersTestCase
         $sql = array_column($this->queriesDuring(fn () => $repository->getOnlineUsers($actor)), 'sql');
 
         $this->assertEmpty(array_filter($sql, fn ($q) => str_contains($q, '`last_seen_at` >')), 'the count and the ids come from the cache');
-        $this->assertCount(2, $sql, 'the users, and their groups: '.implode("\n", $sql));
+        $this->assertCount(1, $sql, 'just the users: '.implode("\n", $sql));
     }
 
     /**
